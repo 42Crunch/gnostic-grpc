@@ -53,14 +53,25 @@ func RunProtoGenerator(env *plugins.Environment) {
 		}
 	}
 
+	model := &Model{Model: surfaceModel}
+	model.Types = []*Type{}
+	for _, st := range surfaceModel.Types {
+		t := &Type{Type: st}
+		for _, sf := range st.Fields {
+			f := &Field{Field: sf}
+			t.Fields = append(t.Fields, f)
+		}
+
+		model.Types = append(model.Types, t)
+	}
 	// Customizes the surface model for a .proto output file
-	NewProtoLanguageModel().Prepare(surfaceModel, inputDocumentType)
+	NewProtoLanguageModel().Prepare(model, inputDocumentType)
 
 	// Create the renderer.
-	renderer := NewRenderer(surfaceModel, openAPIdocument)
+	renderer := NewRenderer(model, openAPIdocument)
 	renderer.Package = packageName
 
-	featureChecker := NewGrpcChecker(surfaceModel, openAPIdocument)
+	featureChecker := NewGrpcChecker(model, openAPIdocument)
 	env.Response.Messages = featureChecker.Run()
 
 	// Run the renderer to generate files and add them to the response object.

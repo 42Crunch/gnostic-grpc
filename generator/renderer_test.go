@@ -22,9 +22,8 @@ import (
 	"strings"
 	"testing"
 
-	surface "github.com/google/gnostic/surface"
-
 	"github.com/42crunch/gnostic-grpc/utils"
+	surface "github.com/google/gnostic/surface"
 )
 
 const (
@@ -93,12 +92,13 @@ func TestFileDescriptorGeneratorOther(t *testing.T) {
 }
 
 func runGeneratorWithoutPluginEnvironment(input string, packageName string) ([]byte, error) {
-	surfaceModel, err := buildSurfaceModel(input)
+	surfaceModelNative, err := buildSurfaceModel(input)
+	surfaceModel := &Model{Model: surfaceModelNative}
 	if err != nil {
 		return nil, err
 	}
 	NewProtoLanguageModel().Prepare(surfaceModel, "openapi.v3.Document")
-	r := NewRenderer(surfaceModel)
+	r := NewRenderer(surfaceModel, nil)
 	r.Package = packageName
 
 	fdSet, err := r.runFileDescriptorSetGenerator()

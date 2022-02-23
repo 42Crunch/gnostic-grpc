@@ -17,12 +17,12 @@ package generator
 import (
 	openapiv3 "github.com/google/gnostic/openapiv3"
 	plugins "github.com/google/gnostic/plugins"
-	surface "github.com/google/gnostic/surface"
+	surface_v1 "github.com/google/gnostic/surface"
 )
 
 type GrpcChecker struct {
 	// The surface to fill
-	surface *surface.Model
+	surface *Model
 	// The document to be analyzed
 	document *openapiv3.Document
 	// The messages that are displayed to the user with information of what is not being processed by the generator.
@@ -30,7 +30,7 @@ type GrpcChecker struct {
 }
 
 // Creates a new checker.
-func NewGrpcChecker(surface *surface.Model, document *openapiv3.Document) *GrpcChecker {
+func NewGrpcChecker(surface *Model, document *openapiv3.Document) *GrpcChecker {
 	return &GrpcChecker{surface: surface, document: document, messages: make([]*plugins.Message, 0)}
 }
 
@@ -231,19 +231,21 @@ func (c *GrpcChecker) analyzeContent(pair *openapiv3.NamedMediaType, parentKeys 
 	}
 }
 
-func oneOf(surfaceType *surface.Type, of []*openapiv3.SchemaOrReference, ofType string) {
+func oneOf(surfaceType *Type, of []*openapiv3.SchemaOrReference, ofType string) {
 	surfaceType.ContentType = ofType
-	surfaceType.Fields = []*surface.Field{}
+	surfaceType.Fields = []*Field{}
 
 	for _, o := range of {
 		ref := o.GetReference().XRef
 		name := toCamelCase(getRefName(ref))
-		surfaceType.Fields = append(surfaceType.Fields, &surface.Field{
-			Name:          name,
-			Type:          name,
-			NativeType:    name,
-			FieldName:     name,
-			ParameterName: name,
+		surfaceType.Fields = append(surfaceType.Fields, &Field{
+			Field: &surface_v1.Field{
+				Name:          name,
+				Type:          name,
+				NativeType:    name,
+				FieldName:     name,
+				ParameterName: name,
+			},
 		})
 	}
 }

@@ -15,7 +15,7 @@ var protoBufScalarTypes = getProtobufTypes()
 var generatedMessages = make(map[string]string, 0)
 
 // isScalarType find if the current type is a scalar type (one type and one field with format)
-func getType(types []*surface_v1.Type, name string) *surface_v1.Type {
+func getType(types []*Type, name string) *Type {
 	for _, ts := range types {
 		if ts.TypeName == name {
 			return ts
@@ -23,7 +23,7 @@ func getType(types []*surface_v1.Type, name string) *surface_v1.Type {
 	}
 	return nil
 }
-func isScalarType(surfaceType *surface_v1.Type) bool {
+func isScalarType(surfaceType *Type) bool {
 	return surfaceType != nil &&
 		len(surfaceType.Fields) == 1 &&
 		surfaceType.Fields[0].Name == "value" &&
@@ -184,7 +184,7 @@ func buildAllMessageDescriptors(renderer *Renderer) (messageDescriptors []*dpb.D
 }
 
 // isRequestParameter checks whether 't' is a type that will be used as a request parameter for a RPC method.
-func isRequestParameter(sufaceType *surface_v1.Type) bool {
+func isRequestParameter(sufaceType *Type) bool {
 	if strings.Contains(sufaceType.Description, sufaceType.GetName()+" holds parameters to") {
 		return true
 	}
@@ -231,7 +231,7 @@ func validateQueryParameter(field *surface_v1.Field) bool {
 	return true
 }
 
-func addFieldDescriptor(message *dpb.DescriptorProto, surfaceField *surface_v1.Field, idx int, packageName, format string, prefix bool, oneOfIndex *int32) {
+func addFieldDescriptor(message *dpb.DescriptorProto, surfaceField *Field, idx int, packageName, format string, prefix bool, oneOfIndex *int32) {
 	count := int32(idx + 1)
 	fieldDescriptor := &dpb.FieldDescriptorProto{Number: &count, Name: &surfaceField.FieldName}
 	fieldDescriptor.Type = getFieldDescriptorType(surfaceField.NativeType, surfaceField.EnumValues)
@@ -279,7 +279,7 @@ func getFieldDescriptorType(nativeType string, enumValues []string) *dpb.FieldDe
 // getFieldDescriptorTypeName returns the typeName of the descriptor. A TypeName has to be set if the field is a reference to another
 // descriptor or enum. Otherwise it is nil. Names are set according to the protocol buffer style guide for message names:
 // https://developers.google.com/protocol-buffers/docs/style#message-and-field-names
-func getFieldDescriptorTypeName(fieldDescriptorType descriptorpb.FieldDescriptorProto_Type, field *surface_v1.Field, packageName string, prefix bool) *string {
+func getFieldDescriptorTypeName(fieldDescriptorType descriptorpb.FieldDescriptorProto_Type, field *Field, packageName string, prefix bool) *string {
 	if fieldHasAReferenceToAMessageInAnotherDependency(field, fieldDescriptorType) {
 		t := generatedMessages[field.NativeType]
 		return &t
@@ -301,13 +301,13 @@ func getFieldDescriptorTypeName(fieldDescriptorType descriptorpb.FieldDescriptor
 
 // fieldHasAReferenceToAMessageInAnotherDependency check whether we generated this message already inside of another
 // dependency. If so we will use that name instead.
-func fieldHasAReferenceToAMessageInAnotherDependency(field *surface_v1.Field, fieldDescriptorType descriptorpb.FieldDescriptorProto_Type) bool {
+func fieldHasAReferenceToAMessageInAnotherDependency(field *Field, fieldDescriptorType descriptorpb.FieldDescriptorProto_Type) bool {
 	_, messageExists := generatedMessages[field.NativeType]
 	return fieldDescriptorType == dpb.FieldDescriptorProto_TYPE_MESSAGE && messageExists
 }
 
 // getFieldDescriptorLabel returns the label for the descriptor based on the information in he surface field.
-func getFieldDescriptorLabel(f *surface_v1.Field) *dpb.FieldDescriptorProto_Label {
+func getFieldDescriptorLabel(f *Field) *dpb.FieldDescriptorProto_Label {
 	label := dpb.FieldDescriptorProto_LABEL_OPTIONAL
 	if f.Kind == surface_v1.FieldKind_ARRAY || strings.Contains(f.NativeType, "map") {
 		label = dpb.FieldDescriptorProto_LABEL_REPEATED
@@ -315,7 +315,7 @@ func getFieldDescriptorLabel(f *surface_v1.Field) *dpb.FieldDescriptorProto_Labe
 	return &label
 }
 
-func addMapDescriptorIfNecessary(f *surface_v1.Field, fieldDescriptor *dpb.FieldDescriptorProto, message *dpb.DescriptorProto) {
+func addMapDescriptorIfNecessary(f *Field, fieldDescriptor *dpb.FieldDescriptorProto, message *dpb.DescriptorProto) {
 	if f.Kind == surface_v1.FieldKind_MAP {
 		// Maps are represented as nested types inside of the descriptor.
 		mapDescriptor := buildMapDescriptor(f)
@@ -330,7 +330,7 @@ func ptr(s string) *string {
 
 // buildMapDescriptor builds the necessary descriptor to render a map. (https://developers.google.com/protocol-buffers/docs/proto3#maps)
 // A map is represented as nested message with two fields: 'key', 'value' and the Options set accordingly.
-func buildMapDescriptor(field *surface_v1.Field) *dpb.DescriptorProto {
+func buildMapDescriptor(field *Field) *dpb.DescriptorProto {
 	isMapEntry := true
 	n := field.FieldName + "Entry"
 
@@ -343,7 +343,7 @@ func buildMapDescriptor(field *surface_v1.Field) *dpb.DescriptorProto {
 }
 
 // buildKeyValueFields builds the necessary 'key', 'value' fields for the map descriptor.
-func buildKeyValueFields(field *surface_v1.Field) []*dpb.FieldDescriptorProto {
+func buildKeyValueFields(field *Field) []*dpb.FieldDescriptorProto {
 	k, v := "key", "value"
 	var n1, n2 int32 = 1, 2
 	l := dpb.FieldDescriptorProto_LABEL_OPTIONAL

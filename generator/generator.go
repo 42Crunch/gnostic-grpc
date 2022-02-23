@@ -93,7 +93,7 @@ func (renderer *Renderer) runFileDescriptorSetGenerator() (fdSet *dpb.FileDescri
 
 // buildSourceCodeInfo builds the object which holds additional information, such as the description from OpenAPI
 // components. This information will be rendered as a comment in the final .proto file.
-func buildSourceCodeInfo(types []*surface_v1.Type) (sourceCodeInfo *dpb.SourceCodeInfo, err error) {
+func buildSourceCodeInfo(types []*Type) (sourceCodeInfo *dpb.SourceCodeInfo, err error) {
 	allLocations := make([]*dpb.SourceCodeInfo_Location, 0)
 	for idx, surfaceType := range types {
 		location := &dpb.SourceCodeInfo_Location{
@@ -132,7 +132,10 @@ func buildSymbolicReferences(renderer *Renderer) (symbolicFileDescriptors []*dpb
 			}
 
 			// Create the surface model. Keep in mind that this resolves the references of the symbolic reference again!
-			surfaceModel, err := surface_v1.NewModelFromOpenAPI3(document, ref)
+			surfaceModelNative, err := surface_v1.NewModelFromOpenAPI3(document, ref)
+			surfaceModel := &Model{
+				Model: surfaceModelNative,
+			}
 			if err != nil {
 				return nil, err
 			}

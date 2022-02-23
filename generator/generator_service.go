@@ -26,7 +26,7 @@ func buildAllServiceDescriptors(messages []*dpb.DescriptorProto, renderer *Rende
 	return services, nil
 }
 
-func buildAllMethodDescriptors(methods []*surface_v1.Method, types []*surface_v1.Type) (allMethodDescriptors []*dpb.MethodDescriptorProto, err error) {
+func buildAllMethodDescriptors(methods []*surface_v1.Method, types []*Type) (allMethodDescriptors []*dpb.MethodDescriptorProto, err error) {
 	for _, method := range methods {
 		methodDescriptor, err := buildMethodDescriptor(method, types)
 		if err != nil {
@@ -37,7 +37,7 @@ func buildAllMethodDescriptors(methods []*surface_v1.Method, types []*surface_v1
 	return allMethodDescriptors, nil
 }
 
-func buildMethodDescriptor(method *surface_v1.Method, types []*surface_v1.Type) (methodDescriptor *dpb.MethodDescriptorProto, err error) {
+func buildMethodDescriptor(method *surface_v1.Method, types []*Type) (methodDescriptor *dpb.MethodDescriptorProto, err error) {
 	options, err := buildMethodOptions(method, types)
 	if err != nil {
 		return nil, err
@@ -52,7 +52,7 @@ func buildMethodDescriptor(method *surface_v1.Method, types []*surface_v1.Type) 
 	return methodDescriptor, nil
 }
 
-func buildMethodOptions(method *surface_v1.Method, types []*surface_v1.Type) (options *dpb.MethodOptions, err error) {
+func buildMethodOptions(method *surface_v1.Method, types []*Type) (options *dpb.MethodOptions, err error) {
 	options = &dpb.MethodOptions{}
 	httpRule := getHttpRuleForMethod(method)
 	httpRule.Body = getRequestBodyForRequestParameter(method.ParametersTypeName, types)
@@ -103,8 +103,8 @@ func getHttpRuleForMethod(method *surface_v1.Method) annotations.HttpRule {
 
 // getRequestBodyForRequestParameter finds the corresponding surface model type for 'name' and returns the name of the
 // field that is a request body. If no such field is found it returns nil.
-func getRequestBodyForRequestParameter(name string, types []*surface_v1.Type) string {
-	requestParameterType := &surface_v1.Type{}
+func getRequestBodyForRequestParameter(name string, types []*Type) string {
+	requestParameterType := &Type{}
 
 	for _, t := range types {
 		if t.TypeName == name {

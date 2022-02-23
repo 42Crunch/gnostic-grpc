@@ -28,7 +28,7 @@ func NewProtoLanguageModel() *ProtoLanguageModel {
 }
 
 // Prepare sets language-specific properties for all types and methods.
-func (language *ProtoLanguageModel) Prepare(model *surface_v1.Model, inputDocumentType string) {
+func (language *ProtoLanguageModel) Prepare(model *Model, inputDocumentType string) {
 	for _, t := range model.Types {
 		// determine the name of protocol buffer messages
 
@@ -135,7 +135,7 @@ func findNativeType(fType string, fFormat string) string {
 // AdjustSurfaceModel simplifies and prettifies the types and fields of the surface model in order to get a better
 // looking output file.
 // Related to: https://github.com/google/gnostic-grpc/issues/11
-func AdjustSurfaceModel(model *surface_v1.Model, inputDocumentType string) {
+func AdjustSurfaceModel(model *Model, inputDocumentType string) {
 	if inputDocumentType == "openapi.v2.Document" {
 		adjustV2Model(model)
 	} else if inputDocumentType == "openapi.v3.Document" {
@@ -150,7 +150,7 @@ func AdjustSurfaceModel(model *surface_v1.Model, inputDocumentType string) {
 }
 
 // adjustV3Model removes unnecessary types from the surface model. The original input file is an OpenAPI v2 file.
-func adjustV3Model(model *surface_v1.Model) {
+func adjustV3Model(model *Model) {
 	nameToType, typesToDelete := initHashTables(model)
 	for _, m := range model.Methods {
 		if len(m.ParametersTypeName) > 0 {
@@ -198,7 +198,7 @@ func adjustV3Model(model *surface_v1.Model) {
 	}
 
 	// Remove types that we don't want to render
-	filteredTypes := make([]*surface_v1.Type, 0)
+	filteredTypes := make([]*Type, 0)
 	for _, t := range model.Types {
 		if shouldDelete, ok := typesToDelete[t]; ok && !shouldDelete {
 			filteredTypes = append(filteredTypes, t)
@@ -208,7 +208,7 @@ func adjustV3Model(model *surface_v1.Model) {
 }
 
 // adjustV2Model removes types from the surface model. The original input file is an OpenAPI v2 file.
-func adjustV2Model(model *surface_v1.Model) {
+func adjustV2Model(model *Model) {
 	nameToType, typesToDelete := initHashTables(model)
 	for _, m := range model.Methods {
 		// We only render messages and types for the response with the lowest status code.
@@ -234,7 +234,7 @@ func adjustV2Model(model *surface_v1.Model) {
 	}
 
 	// Remove types that we don't want to render
-	filteredTypes := make([]*surface_v1.Type, 0)
+	filteredTypes := make([]*Type, 0)
 	for _, t := range model.Types {
 		if shouldDelete, ok := typesToDelete[t]; ok && !shouldDelete {
 			filteredTypes = append(filteredTypes, t)
@@ -244,7 +244,7 @@ func adjustV2Model(model *surface_v1.Model) {
 }
 
 // findLowestStatusCode returns a surface Type that represents the lowest status code for the given 'responses' type.
-func findLowestStatusCode(responses *surface_v1.Type, nameToType map[string]*surface_v1.Type) *surface_v1.Type {
+func findLowestStatusCode(responses *Type, nameToType map[string]*Type) *Type {
 	if lowestStatusCodeResponse, ok := nameToType[responses.Fields[0].NativeType]; ok {
 		lowestStatusCode, err := strconv.Atoi(responses.Fields[0].FieldName)
 		if err == nil {
@@ -262,9 +262,9 @@ func findLowestStatusCode(responses *surface_v1.Type, nameToType map[string]*sur
 }
 
 // initHashTables is a helper function to initialize two hash tables which are used in adjustV2Model and adjustV2Model
-func initHashTables(model *surface_v1.Model) (map[string]*surface_v1.Type, map[*surface_v1.Type]bool) {
-	nameToType := make(map[string]*surface_v1.Type)
-	typesToDelete := make(map[*surface_v1.Type]bool)
+func initHashTables(model *Model) (map[string]*Type, map[*Type]bool) {
+	nameToType := make(map[string]*Type)
+	typesToDelete := make(map[*Type]bool)
 
 	for _, t := range model.Types {
 		nameToType[t.TypeName] = t
