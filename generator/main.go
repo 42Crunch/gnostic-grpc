@@ -53,17 +53,8 @@ func RunProtoGenerator(env *plugins.Environment) {
 		}
 	}
 
-	model := &Model{Model: surfaceModel}
-	model.Types = []*Type{}
-	for _, st := range surfaceModel.Types {
-		t := &Type{Type: st}
-		for _, sf := range st.Fields {
-			f := &Field{Field: sf}
-			t.Fields = append(t.Fields, f)
-		}
+	model := extendModel(surfaceModel)
 
-		model.Types = append(model.Types, t)
-	}
 	// Customizes the surface model for a .proto output file
 	NewProtoLanguageModel().Prepare(model, inputDocumentType)
 
@@ -107,4 +98,20 @@ func getFilenameWithoutFileExtension(env *plugins.Environment) string {
 		fileName = fileName[0 : len(fileName)-len(extension)]
 	}
 	return fileName
+}
+
+func extendModel(surfaceModel *surface.Model) *Model {
+	model := &Model{Model: surfaceModel}
+	model.Types = []*Type{}
+	for _, st := range surfaceModel.Types {
+		t := &Type{Type: st}
+		for _, sf := range st.Fields {
+			f := &Field{Field: sf}
+			t.Fields = append(t.Fields, f)
+		}
+
+		model.Types = append(model.Types, t)
+	}
+
+	return model
 }

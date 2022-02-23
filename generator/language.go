@@ -27,12 +27,14 @@ func NewProtoLanguageModel() *ProtoLanguageModel {
 	return &ProtoLanguageModel{}
 }
 
+const Request = "Request"
+
 // Prepare sets language-specific properties for all types and methods.
 func (language *ProtoLanguageModel) Prepare(model *Model, inputDocumentType string) {
 	for _, t := range model.Types {
 		// determine the name of protocol buffer messages
 
-		t.TypeName = protoTypeName(strings.Replace(t.Name, "Parameters", "Request", 1))
+		t.TypeName = protoTypeName(strings.Replace(t.Name, "Parameters", Request, 1))
 
 		for _, f := range t.Fields {
 			f.FieldName = protoFieldName(f.Name, f.Type)
@@ -48,7 +50,7 @@ func (language *ProtoLanguageModel) Prepare(model *Model, inputDocumentType stri
 		m.HandlerName = protoTypeName(m.Name)
 		m.ProcessorName = m.Name
 		m.ClientName = m.Name
-		m.ParametersTypeName = protoTypeName(strings.Replace(m.ParametersTypeName, "Parameters", "Request", 1))
+		m.ParametersTypeName = protoTypeName(strings.Replace(m.ParametersTypeName, "Parameters", Request, 1))
 		m.ResponsesTypeName = protoTypeName(m.ResponsesTypeName)
 	}
 

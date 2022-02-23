@@ -14,7 +14,6 @@ var protoBufScalarTypes = getProtobufTypes()
 // Gathers all messages that have been generated from symbolic references in recursive calls.
 var generatedMessages = make(map[string]string, 0)
 
-// isScalarType find if the current type is a scalar type (one type and one field with format)
 func getType(types []*Type, name string) *Type {
 	for _, ts := range types {
 		if ts.TypeName == name {
@@ -23,6 +22,16 @@ func getType(types []*Type, name string) *Type {
 	}
 	return nil
 }
+
+func getField(typ *Type, name string) *Field {
+	for _, fs := range typ.Fields {
+		if fs.Name == name {
+			return fs
+		}
+	}
+	return nil
+}
+
 func isScalarType(surfaceType *Type) bool {
 	return surfaceType != nil &&
 		len(surfaceType.Fields) == 1 &&
@@ -84,7 +93,6 @@ func buildAllMessageDescriptors(renderer *Renderer) (messageDescriptors []*dpb.D
 				b32 := int32(0)
 				oneOfIndex = &b32
 			}
-			format := ""
 			prefix := true
 			if strings.Contains(surfaceField.NativeType, "map[string][]") {
 				// Not supported for now: https://github.com/LorenzHW/gnostic-grpc-deprecated/issues/3#issuecomment-509348357
@@ -100,7 +108,6 @@ func buildAllMessageDescriptors(renderer *Renderer) (messageDescriptors []*dpb.D
 								if ts.Fields[0].Name != "value" {
 									surfaceField.Name = ts.Fields[0].Name
 									surfaceField.FieldName = ts.Fields[0].Name
-									//format = ts.Fields[0].Format
 								}
 							}
 						}
@@ -108,12 +115,10 @@ func buildAllMessageDescriptors(renderer *Renderer) (messageDescriptors []*dpb.D
 					} else {
 						surfaceField.Type = "string"
 						surfaceField.NativeType = "string"
-						//format = surfaceField.Format
 					}
 				case surface_v1.Position_QUERY:
 					if ts := getType(renderer.Model.Types, surfaceField.Type); ts != nil {
 						if ts.Fields[0].Type == "arrayString" {
-							format = surfaceField.Type
 							surfaceField.Type = "string"
 							surfaceField.NativeType = "string"
 							surfaceField.Kind = surface_v1.FieldKind_ARRAY
@@ -152,7 +157,6 @@ func buildAllMessageDescriptors(renderer *Renderer) (messageDescriptors []*dpb.D
 					}
 					surfaceField.Format = ts.Fields[0].Format
 				}
-				format = surfaceField.Format
 
 				for _, ts := range renderer.Model.Types {
 					if surfaceField.Type == ts.Name {
@@ -172,8 +176,7 @@ func buildAllMessageDescriptors(renderer *Renderer) (messageDescriptors []*dpb.D
 					}
 				}
 			}
-
-			addFieldDescriptor(message, surfaceField, i, renderer.Package, format, prefix, oneOfIndex)
+			addFieldDescriptor(message, surfaceField, i, renderer.Package, surfaceField.toTags(), prefix, oneOfIndex)
 			//addEnumDescriptorIfNecessary(message, surfaceField)
 		}
 
@@ -231,34 +234,39 @@ func validateQueryParameter(field *surface_v1.Field) bool {
 	return true
 }
 
-func addFieldDescriptor(message *dpb.DescriptorProto, surfaceField *Field, idx int, packageName, format string, prefix bool, oneOfIndex *int32) {
+func addFieldDescriptor(message *dpb.DescriptorProto, surfaceField *Field, idx int, packageName string, tags map[string]string, prefix bool, oneOfIndex *int32) {
 	count := int32(idx + 1)
+	var opts []*dpb.UninterpretedOption
+	if len(tags) > 0 {
+		opts = []*dpb.UninterpretedOption{
+			{
+				Name: []*dpb.UninterpretedOption_NamePart{
+					{NamePart: ptr("json_name")},
+				},
+				AggregateValue: ptr(`"` + surfaceField.Name + `"]; // @gotags: ` + tagsToString(tags)),
+			},
+		}
+	}
 	fieldDescriptor := &dpb.FieldDescriptorProto{Number: &count, Name: &surfaceField.FieldName}
 	fieldDescriptor.Type = getFieldDescriptorType(surfaceField.NativeType, surfaceField.EnumValues)
 	fieldDescriptor.Label = getFieldDescriptorLabel(surfaceField)
 	fieldDescriptor.OneofIndex = oneOfIndex
 	fieldDescriptor.TypeName = getFieldDescriptorTypeName(*fieldDescriptor.Type, surfaceField, packageName, prefix)
-	fieldDescriptor.Options = &dpb.FieldOptions{
-		UninterpretedOption: []*dpb.UninterpretedOption{
-			//{
-			//	Name: []*dpb.UninterpretedOption_NamePart{
-			//		{NamePart: ptr("(validator.field)")},
-			//	},
-			//	AggregateValue: ptr("{int_gt: 0, int_lt: 100}"),
-			//},
-			{
-				Name: []*dpb.UninterpretedOption_NamePart{
-					{NamePart: ptr("json_name")},
-				},
-				AggregateValue: ptr(`"` + surfaceField.Name + `"]; // @gotags: json:"` + surfaceField.Name + `" format:"` + format + `" `),
-			},
-		},
-	}
-	if format != "" {
-	}
+	fieldDescriptor.Options = &dpb.FieldOptions{UninterpretedOption: opts}
 	addMapDescriptorIfNecessary(surfaceField, fieldDescriptor, message)
 
 	message.Field = append(message.Field, fieldDescriptor)
+}
+
+func tagsToString(tags map[string]string) string {
+	s := ""
+	space := ""
+	for s2, s3 := range tags {
+		s = s + space + s2 + `:"` + s3 + `"`
+		space = " "
+	}
+
+	return s
 }
 
 // getFieldDescriptorType returns a field descriptor type for the given 'nativeType'. If it is not a scalar type

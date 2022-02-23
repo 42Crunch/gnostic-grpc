@@ -81,7 +81,7 @@ func (c *GrpcChecker) analyzeComponents() {
 	if parameters := components.GetParameters(); parameters != nil {
 		for _, pair := range parameters.AdditionalProperties {
 			parentKeys := append(currentKeys, "parameters")
-			c.analyzeParameter(pair.Value, parentKeys)
+			c.analyzeParameter(pair.Name, pair.Value, parentKeys)
 		}
 	}
 
@@ -123,23 +123,27 @@ func (c *GrpcChecker) analyzePathItem(pair *openapiv3.NamedPathItem, parentKeys 
 // Analyzes a single Operation.
 func (c *GrpcChecker) analyzeOperation(operation *openapiv3.Operation, parentKeys []string) {
 	currentKeys := parentKeys
-	//fields := getNotSupportedOperationFields(operation)
-
-	//if len(operation.OperationId) == 0 {
-	//	text := "One of your operations does not have an 'operationId'. gnostic-grpc might produce an incorrect output file."
-	//	msg := constructWarningMessage("OPERATION", text, currentKeys)
-	//	c.messages = append(c.messages, &msg)
-	//}
-
-	//for _, f := range fields {
-	//	text := "Field: '" + f + "' is not supported for operation: " + operation.OperationId
-	//	msg := constructInfoMessage("OPERATIONFIELDS", text, append(copyKeys(currentKeys), f))
-	//	c.messages = append(c.messages, &msg)
-	//}
+	typeName := operation.GetOperationId() + Request
+	surfaceType := getType(c.surface.Types, typeName)
 
 	for _, param := range operation.Parameters {
+		if surfaceType != nil {
+			// If there is a surfaceType then we should fill the properties from the OAS schema
+			schema := c.getSchemaFromParametersOrReference(param)
+			var name string
+			switch param.GetOneof().(type) {
+			case *openapiv3.ParameterOrReference_Parameter:
+				name = param.GetParameter().GetName()
+			case *openapiv3.ParameterOrReference_Reference:
+				name = getRefName(param.GetReference().XRef)
+			}
+			field := getField(surfaceType, name)
+			if field != nil {
+				schemaPropertiesToSurface(schema, field)
+			}
+		}
 		pKeys := append(currentKeys, "parameters")
-		c.analyzeParameter(param, pKeys)
+		c.analyzeParameter("", param, pKeys)
 	}
 
 	for _, response := range operation.Responses.GetResponseOrReference() {
@@ -160,7 +164,7 @@ func (c *GrpcChecker) analyzeOperation(operation *openapiv3.Operation, parentKey
 }
 
 // Analyzes the parameter.
-func (c *GrpcChecker) analyzeParameter(paramOrRef *openapiv3.ParameterOrReference, parentKeys []string) {
+func (c *GrpcChecker) analyzeParameter(name string, paramOrRef *openapiv3.ParameterOrReference, parentKeys []string) {
 	currentKeys := parentKeys
 
 	if parameter := paramOrRef.GetParameter(); parameter != nil {
@@ -172,7 +176,7 @@ func (c *GrpcChecker) analyzeParameter(paramOrRef *openapiv3.ParameterOrReferenc
 		//}
 
 		pKeys := append(currentKeys, "schema")
-		c.analyzeSchema(parameter.Name, parameter.Schema, pKeys)
+		c.analyzeSchema(name, parameter.Schema, pKeys)
 	}
 }
 
@@ -252,59 +256,69 @@ func oneOf(surfaceType *Type, of []*openapiv3.SchemaOrReference, ofType string) 
 
 // Analyzes the schema.
 func (c *GrpcChecker) analyzeSchema(identifier string, schemaOrReference *openapiv3.SchemaOrReference, parentKeys []string) {
-	currentKeys := parentKeys
-	surfaceType := getType(c.surface.Types, toCamelCase(identifier))
+	schema := schemaOrReference.GetSchema()
+	if schema == nil {
+		schema = c.getSchemaFromSchemaOrReference(schemaOrReference)
+	}
 
-	if schema := schemaOrReference.GetSchema(); schema != nil {
-		//if isScalarType(surfaceType) {
-		//	b, err := json.Marshal(schema)
-		//	if err != nil {
-		//		log.Printf("cannot unmarshall schema: %v", err)
-		//	}
-		//	surfaceType.Fields[0].Format = string(b)
-		//}
+	if schema != nil {
+		surfaceType := getType(c.surface.Types, toCamelCase(identifier))
+		if surfaceType != nil {
+			// If there is a surfaceType then we should fill the properties from the OAS schema
+			schemaFields := schema.Properties.GetAdditionalProperties()
+			// schema is an object
+			if len(schemaFields) > 0 {
+				for _, schemaField := range schemaFields {
+					//log.Printf("Field: ----------- %s ----------- \n", schemaField.GetName())
+					surfaceField := surfaceType.GetField(schemaField.GetName())
+					schemaProperties := c.getSchemaFromSchemaOrReference(schemaField.GetValue())
+					schemaPropertiesToSurface(schemaProperties, surfaceField)
+				}
 
+				// schema is a scalar
+			} else {
+				surfaceField := surfaceType.Fields[0]
+				schemaPropertiesToSurface(schema, surfaceField)
+			}
+		}
 		if schema.OneOf != nil {
 			oneOf(surfaceType, schema.OneOf, "ONE_OF")
 		} else if schema.AnyOf != nil {
 			oneOf(surfaceType, schema.AnyOf, "ANY_OF")
 		}
+	}
+}
 
-		//fields := getNotSupportedSchemaFields(schema)
-		//for _, f := range fields {
-		//	text := "Field: '" + f + "' is not supported for the schema: " + identifier
-		//	msg := constructInfoMessage("SCHEMAFIELDS", text, append(copyKeys(currentKeys), f))
-		//	c.messages = append(c.messages, &msg)
-		//}
-
-		// Check for this: https://github.com/LorenzHW/gnostic-grpc-deprecated/issues/3#issuecomment-509348357
-		if additionalProperties := schema.AdditionalProperties; additionalProperties != nil {
-			if schema := additionalProperties.GetSchemaOrReference().GetSchema(); schema != nil {
-				if schema.Type == "array" {
-					text := "Field: 'additionalProperties' with type array is generated as empty message inside .proto."
-					msg := constructInfoMessage("SCHEMAFIELDS", text, append(copyKeys(currentKeys), "additionalProperties"))
-					c.messages = append(c.messages, &msg)
-				}
-			}
+func schemaPropertiesToSurface(schema *openapiv3.Schema, surface *Field) {
+	if surface != nil {
+		minimum := schema.GetMinimum()
+		if minimum != 0 {
+			surface.ParamMinimum = Float64(minimum)
 		}
 
-		if items := schema.Items; items != nil {
-			for _, schemaOrRef := range items.SchemaOrReference {
-				pKeys := append(currentKeys, "items")
-				c.analyzeSchema("Items of "+identifier, schemaOrRef, pKeys)
-			}
+		maximum := schema.GetMaximum()
+		if maximum != 0 {
+			surface.ParamMaximum = Float64(maximum)
 		}
 
-		if properties := schema.Properties; properties != nil {
-			for _, pair := range properties.AdditionalProperties {
-				pKeys := append(currentKeys, []string{"properties", pair.Name}...)
-				c.analyzeSchema(pair.Name, pair.Value, pKeys)
-			}
+		minLength := schema.GetMinLength()
+		if minLength != 0 {
+			surface.ParamMinLength = Int64(minLength)
 		}
 
-		if additionalProperties := schema.AdditionalProperties; additionalProperties != nil {
-			pKeys := append(currentKeys, "additionalProperties")
-			c.analyzeSchema("AdditionalProperties of "+identifier, additionalProperties.GetSchemaOrReference(), pKeys)
+		maxLength := schema.GetMaxLength()
+		if maxLength != 0 {
+			surface.ParamMaxLength = Int64(maxLength)
+		}
+
+		pattern := schema.GetPattern()
+		if pattern != "" {
+			surface.ParamPattern = String(pattern)
+		}
+
+		format := schema.GetFormat()
+		if format != "" {
+			surface.ParamFormat = String(format)
 		}
 	}
 }

@@ -17,3 +17,6 @@
 
 # IDEs
 .idea/*
+
+test.yaml
+apid.proto
