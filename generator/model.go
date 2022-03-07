@@ -35,8 +35,7 @@ func Float64(i float64) *float64 {
 func (f *Field) toTags() map[string]string {
 	tags := make(map[string]string)
 	if f.ParamPattern != nil {
-		pattern := strings.Replace(*f.ParamPattern, "\n", "\\n", -1)
-		pattern = strings.Replace(pattern, "\r", "\\r", -1)
+		pattern := strings.Replace(*f.ParamPattern, `\`, `\\`, -1)
 		tags["pattern"] = pattern
 	}
 	if f.ParamFormat != nil {
