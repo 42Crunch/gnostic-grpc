@@ -222,12 +222,12 @@ func (c *GrpcChecker) analyzeContent(pair *openapiv3.NamedMediaType, parentKeys 
 	currentKeys := parentKeys
 	mediaType := pair.Value
 
-	fields := getNotSupportedMediaTypeFields(mediaType)
-	for _, f := range fields {
-		text := "Field: '" + f + "' is not supported for the mediatype: " + pair.Name
-		msg := constructInfoMessage("MEDIATYPEFIELDS", text, append(copyKeys(currentKeys), f))
-		c.messages = append(c.messages, &msg)
-	}
+	//fields := getNotSupportedMediaTypeFields(mediaType)
+	//for _, f := range fields {
+	//	text := "Field: '" + f + "' is not supported for the mediatype: " + pair.Name
+	//	msg := constructInfoMessage("MEDIATYPEFIELDS", text, append(copyKeys(currentKeys), f))
+	//	c.messages = append(c.messages, &msg)
+	//}
 
 	if mediaType.Schema != nil {
 		pKeys := append(currentKeys, "schema")
@@ -236,6 +236,9 @@ func (c *GrpcChecker) analyzeContent(pair *openapiv3.NamedMediaType, parentKeys 
 }
 
 func oneOf(surfaceType *Type, of []*openapiv3.SchemaOrReference, ofType string) {
+	if of == nil || surfaceType == nil {
+		return
+	}
 	surfaceType.ContentType = ofType
 	surfaceType.Fields = []*Field{}
 
@@ -276,7 +279,7 @@ func (c *GrpcChecker) analyzeSchema(identifier string, schemaOrReference *openap
 				}
 
 				// schema is a scalar
-			} else {
+			} else if len(surfaceType.Fields) > 0 {
 				surfaceField := surfaceType.Fields[0]
 				schemaPropertiesToSurface(schema, surfaceField)
 			}
